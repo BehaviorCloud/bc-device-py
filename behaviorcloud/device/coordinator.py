@@ -30,7 +30,7 @@ class Coordinator:
 		self.parser = argparse.ArgumentParser(description='Run a device firmware for the BehaviorCloud platform.')
 		self.parser.add_argument('--host', nargs='?', required=True, help='The hostname of the BehaviorCloud api server. Typically, this is api.behaviorcloud.com.')
 		self.parser.add_argument('--token', nargs='?', required=True, help='The JWT token provided by the BehaviorCloud platform.')
-		self.parser.add_argument('--id', nargs='?', help='The device id.')
+		self.parser.add_argument('--id', nargs='?', required=True, help='The device id.')
 		self.parser.add_argument('--continuous', action='store_true', help='Will run this device in a continuous collection mode.')
 
 	def spawn(self, dataset_id=None):
@@ -125,7 +125,7 @@ class Coordinator:
 				del self.expirations[dataset_id]
 				self.device.stop_collection(dataset_id)
 
-	def check_expirations(self)
+	def check_expirations(self):
 		to_remove = []
 		for dataset_id, expiration in enumerate(self.expirations):
 			if expiration < datetime.datetime.now():

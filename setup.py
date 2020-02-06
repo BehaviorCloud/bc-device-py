@@ -1,19 +1,20 @@
 from distutils.core import setup
 setup(
-  name = 'bc-analyzer',
-  packages = ['behaviorcloud.analyzer'],
+  name = 'bc-device',
+  packages = ['behaviorcloud.device'],
   version = '0.1.1',
   license='MIT',
-  description = 'A package to create a BehaviorCloud compatible data analyzer.',
-  author = 'Christian Lent',
-  author_email = 'christian@behaviorcloud.com',
-  url = 'https://github.com/behaviorcloud/bc-analyzer-py',
-  download_url = 'https://github.com/behaviorcloud/bc-analyzer-py/archive/v0.1.1.tar.gz',
-  keywords = ['behaviorcloud', 'behavior', 'cloud', 'analyzer', 'analyze', 'analysis', 'data', 'daemon', 'api'],
+  description = 'A package to create a BehaviorCloud compatible device firmware.',
+  author = 'Derek Edwards',
+  author_email = 'derek@behaviorcloud.com',
+  url = 'https://github.com/behaviorcloud/bc-device-py',
+  download_url = 'https://github.com/behaviorcloud/bc-device-py/archive/v0.1.1.tar.gz',
+  keywords = ['behaviorcloud', 'behavior', 'cloud', 'device', 'data', 'daemon', 'api'],
   install_requires=[
     'python-dateutil',
     'requests',
     'sentry-sdk',
+    'paho-mqtt',
   ],
   classifiers=[
     'Development Status :: 3 - Alpha',
