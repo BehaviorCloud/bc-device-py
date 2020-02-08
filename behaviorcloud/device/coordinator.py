@@ -1,9 +1,17 @@
 import argparse
 import datetime
+import json
 import sys
 import threading
 import time
 import paho.mqtt.client as mqtt
+import dateutil.parser
+
+# Python 2+3 compatibility
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 
 from . import api
 from . import data
@@ -27,6 +35,7 @@ class Coordinator:
 		self.running = False
 		self.datasets = []
 		self.expirations = {}
+		self.expirations_lock = threading.Lock()
 		self.parser = argparse.ArgumentParser(description='Run a device firmware for the BehaviorCloud platform.')
 		self.parser.add_argument('--host', nargs='?', required=True, help='The hostname of the BehaviorCloud api server. Typically, this is api.behaviorcloud.com.')
 		self.parser.add_argument('--token', nargs='?', required=True, help='The JWT token provided by the BehaviorCloud platform.')
@@ -58,11 +67,20 @@ class Coordinator:
 		self.device_record = api.get_device_realtime_datasets(arguments.id)
 		self.datasets = self.device_record['realtime_datasets']
 
+		flush_print('Device record loaded: {}'.format(
+			self.device_record)
+		)
+		
 		# if any RT datasets are already in collecting mode, spawn immediately
 		# and set expirations appropriately.
 		for dataset in self.datasets:
-			if dataset['observe_through'] > datetime.datetime.now():
-				self.expirations[dataset['id']] = dataset['observe_through']
+			observe_through = dateutil.parser.parse(dataset['observe_through'], ignoretz=True)
+			flush_print('Dataset {} observe-through: {}'.format(
+				dataset['id'],
+				observe_through)
+			)
+			if observe_through > datetime.datetime.now():
+				self.expirations[dataset['id']] = observe_through
 				self.spawn(dataset['id'])
 
 		# subscribe to RT datasets
@@ -95,14 +113,23 @@ class Coordinator:
 		}
 		self.mqtt_client.ws_set_options(path='?'.join([parsed_url.path, parsed_url.query]), headers=headers)
 		
+		def handle_subscribe(client, userdata, mid, granted_qos):
+			flush_print('Subscription success')
+		
 		def handle_connect(client, data, flags, rc):
 			self.mqtt_client.on_message = self.handle_message
 			for dataset in self.datasets:
 				if dataset['model_updates_topic'] is not None:
+					self.mqtt_client.on_subscribe = handle_subscribe
 					self.mqtt_client.subscribe(dataset['model_updates_topic'])
-			flush_print('Subscribed to realtime datasets')
+					flush_print('Subscribing to realtime updates for {} on {}'.format(
+						dataset['id'],
+						dataset['model_updates_topic']
+					))
+				
+			flush_print('Waiting...')
 		
-		self.mqtt_client.on_connect = self.on_mqtt_connect
+		self.mqtt_client.on_connect = handle_connect
 		flush_print('Trying to connect to realtime endpoint {}'.format(
 			self.datasets[0]['model_updates_endpoint'])
 		)
@@ -110,12 +137,21 @@ class Coordinator:
 		self.mqtt_client.loop_start()
 	
 	def handle_message(self, client, userdata, message):
-		dataset_id = message.topic.split('/')[-1]
-		payload = json.loads(message.payload)
-		if 'observe_through' in payload:
-			self.process_expiration(dataset_id, observe_through)
-
+		try:
+			dataset_id = message.topic.split('/')[-1]
+			payload = json.loads(str(message.payload, 'utf-8'))
+			flush_print('Model update received for {}: {}'.format(
+				dataset_id,
+				payload)
+			)
+			if 'observe_through' in payload:
+				observe_through = dateutil.parser.parse(payload['observe_through'], ignoretz=True)
+				self.process_expiration(dataset_id, observe_through)
+		except Exception as e:
+			flush_print("Exception in handle_message: {}".format(e))
+			
 	def process_expiration(self, dataset_id, expiration):
+		self.expirations_lock.acquire()
 		if not dataset_id in self.expirations:
 			self.expirations[dataset_id] = expiration
 			self.spawn(dataset_id)
@@ -124,12 +160,19 @@ class Coordinator:
 			if expiration < datetime.datetime.now():
 				del self.expirations[dataset_id]
 				self.device.stop_collection(dataset_id)
+		self.expirations_lock.release()
 
 	def check_expirations(self):
 		to_remove = []
-		for dataset_id, expiration in enumerate(self.expirations):
+		self.expirations_lock.acquire()
+		for dataset_id in self.expirations:
+			expiration = self.expirations[dataset_id]
+			if type(expiration) is not datetime.datetime:
+				flush_print("Bad expiration state {}".format(self.expirations))
+				return
 			if expiration < datetime.datetime.now():
 				to_remove.append(dataset_id)
 				self.device.stop_collection(dataset_id)
 		for dataset_id in to_remove:
 			del self.expirations[dataset_id]
+		self.expirations_lock.release()
