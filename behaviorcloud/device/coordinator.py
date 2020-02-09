@@ -36,15 +36,17 @@ class Coordinator:
 		self.datasets = []
 		self.expirations = {}
 		self.expirations_lock = threading.Lock()
+		self.simulated_mode = False
 		self.parser = argparse.ArgumentParser(description='Run a device firmware for the BehaviorCloud platform.')
 		self.parser.add_argument('--host', nargs='?', required=True, help='The hostname of the BehaviorCloud api server. Typically, this is api.behaviorcloud.com.')
 		self.parser.add_argument('--token', nargs='?', required=True, help='The JWT token provided by the BehaviorCloud platform.')
 		self.parser.add_argument('--id', nargs='?', required=True, help='The device id.')
 		self.parser.add_argument('--continuous', action='store_true', help='Will run this device in a continuous collection mode.')
+		self.parser.add_argument('--simulated', action='store_true', help='Will have the device stream simulated data.')
 
 	def spawn(self, dataset=None):
 		if self.device is None:
-			self.device = self.device_klass()
+			self.device = self.device_klass(simulated=self.simulated_mode)
 		if dataset is None:
 			for dataset in self.datasets:
 				self.device.start_collection(dataset)
@@ -58,6 +60,7 @@ class Coordinator:
 			'TOKEN': arguments.token,
 			'API_VERSION': '1.1',
 		})
+		self.simulated_mode = arguments.simulated
 
 		if not arguments.id:
 			flush_print('You must supply an id')
