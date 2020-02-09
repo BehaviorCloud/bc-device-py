@@ -4,8 +4,8 @@ class Device(object):
         if configuration is not None:
             self.config = configuration
     
-    def start_collection(self, dataset_id):
+    def start_collection(self, dataset):
         raise Exception('Not implemented')
 
-    def stop_collection(self, dataset_id):
+    def stop_collection(self, dataset):
         raise Exception('Not implemented')

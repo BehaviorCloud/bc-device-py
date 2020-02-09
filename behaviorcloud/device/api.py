@@ -51,6 +51,14 @@ def dataset_attach_data(id, data, extension):
     response.raise_for_status()
     return response.json()
 
+def dataset_get_credentials(id):
+    response = requests.get(
+        globals.get_full_url('datasets/%s/get_credentials' % (id)),
+        headers=globals.get_headers(),
+    )
+    response.raise_for_status()
+    return response.json()
+
 def dataset_update_state(id, fields):
     response = requests.put(
         globals.get_full_url('datasets/%s/update_state' % (id)),
@@ -75,3 +83,4 @@ def get_device_realtime_datasets(id):
     )
     response.raise_for_status()
     return response.json()
+

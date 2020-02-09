@@ -42,14 +42,14 @@ class Coordinator:
 		self.parser.add_argument('--id', nargs='?', required=True, help='The device id.')
 		self.parser.add_argument('--continuous', action='store_true', help='Will run this device in a continuous collection mode.')
 
-	def spawn(self, dataset_id=None):
+	def spawn(self, dataset=None):
 		if self.device is None:
 			self.device = self.device_klass()
-		if dataset_id is None:
-			for dataset_id in self.datasets:
-				self.device.start_collection(dataset_id)
+		if dataset is None:
+			for dataset in self.datasets:
+				self.device.start_collection(dataset)
 		else:
-			self.device.start_collection(dataset_id)
+			self.device.start_collection(dataset)
 
 	def run(self):
 		arguments = self.parser.parse_args()
@@ -76,12 +76,12 @@ class Coordinator:
 		for dataset in self.datasets:
 			observe_through = dateutil.parser.parse(dataset['observe_through'], ignoretz=True)
 			flush_print('Dataset {} observe-through: {}'.format(
-				dataset['id'],
+				dataset['uuid'],
 				observe_through)
 			)
 			if observe_through > datetime.datetime.now():
-				self.expirations[dataset['id']] = observe_through
-				self.spawn(dataset['id'])
+				self.expirations[dataset['uuid']] = observe_through
+				self.spawn(dataset)
 
 		# subscribe to RT datasets
 		self.connect_mqtt()
@@ -123,7 +123,7 @@ class Coordinator:
 					self.mqtt_client.on_subscribe = handle_subscribe
 					self.mqtt_client.subscribe(dataset['model_updates_topic'])
 					flush_print('Subscribing to realtime updates for {} on {}'.format(
-						dataset['id'],
+						dataset['uuid'],
 						dataset['model_updates_topic']
 					))
 				
@@ -138,41 +138,48 @@ class Coordinator:
 	
 	def handle_message(self, client, userdata, message):
 		try:
-			dataset_id = message.topic.split('/')[-1]
+			dataset_uuid = message.topic.split('/')[-1]
 			payload = json.loads(str(message.payload, 'utf-8'))
 			flush_print('Model update received for {}: {}'.format(
-				dataset_id,
+				dataset_uuid,
 				payload)
 			)
 			if 'observe_through' in payload:
 				observe_through = dateutil.parser.parse(payload['observe_through'], ignoretz=True)
-				self.process_expiration(dataset_id, observe_through)
+				self.process_expiration(dataset_uuid, observe_through)
 		except Exception as e:
 			flush_print("Exception in handle_message: {}".format(e))
 			
-	def process_expiration(self, dataset_id, expiration):
+	def find_dataset(self, dataset_uuid):
+		for dataset in self.datasets:
+			if dataset['uuid'] == dataset_uuid:
+				return dataset
+		return None
+	
+	def process_expiration(self, dataset_uuid, expiration):
 		self.expirations_lock.acquire()
-		if not dataset_id in self.expirations:
-			self.expirations[dataset_id] = expiration
-			self.spawn(dataset_id)
+		dataset = self.find_dataset(dataset_uuid)
+		if not dataset_uuid in self.expirations:
+			self.expirations[dataset_uuid] = expiration
+			self.spawn(dataset)
 		else:
-			self.expirations[dataset_id] = expiration
+			self.expirations[dataset_uuid] = expiration
 			if expiration < datetime.datetime.now():
-				del self.expirations[dataset_id]
-				self.device.stop_collection(dataset_id)
+				del self.expirations[dataset_uuid]
+				self.device.stop_collection(dataset)
 		self.expirations_lock.release()
 
 	def check_expirations(self):
 		to_remove = []
 		self.expirations_lock.acquire()
-		for dataset_id in self.expirations:
-			expiration = self.expirations[dataset_id]
+		for dataset_uuid in self.expirations:
+			expiration = self.expirations[dataset_uuid]
 			if type(expiration) is not datetime.datetime:
 				flush_print("Bad expiration state {}".format(self.expirations))
 				return
 			if expiration < datetime.datetime.now():
-				to_remove.append(dataset_id)
-				self.device.stop_collection(dataset_id)
-		for dataset_id in to_remove:
-			del self.expirations[dataset_id]
+				to_remove.append(dataset_uuid)
+				self.device.stop_collection(self.find_dataset(dataset_uuid))
+		for dataset_uuid in to_remove:
+			del self.expirations[dataset_uuid]
 		self.expirations_lock.release()
