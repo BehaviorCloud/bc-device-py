@@ -14,6 +14,7 @@ def get_full_url(relative_url):
 def get_headers():
     return {
 		'Accept': 'application/json',
-		'Authorization': 'JWT %s' % (config['TOKEN']),
+		# 'Authorization': 'JWT %s' % (config['TOKEN']),
+        'X-BC-AUTH': config['TOKEN'],
 		'Content-Type': 'application/json',
 	}

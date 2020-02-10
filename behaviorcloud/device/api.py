@@ -51,13 +51,22 @@ def dataset_attach_data(id, data, extension):
     response.raise_for_status()
     return response.json()
 
-def dataset_get_credentials(id):
-    response = requests.get(
-        globals.get_full_url('datasets/%s/get_credentials' % (id)),
-        headers=globals.get_headers(),
-    )
-    response.raise_for_status()
-    return response.json()
+# def dataset_get_credentials(id):
+#     response = requests.get(
+#         globals.get_full_url('datasets/%s/get_credentials' % (id)),
+#         headers=globals.get_headers(),
+#     )
+#     response.raise_for_status()
+#     return response.json()
+
+def device_generate_dataset_credentials(device_id, ds_id):
+        response = requests.post(
+            globals.get_full_url('devices/%s/generate_dataset_credentials' % (device_id)),
+            json={'dataset_id': ds_id},
+            headers=globals.get_headers(),
+        )
+        response.raise_for_status()
+        return response.json()
 
 def dataset_update_state(id, fields):
     response = requests.put(
@@ -83,4 +92,17 @@ def get_device_realtime_datasets(id):
     )
     response.raise_for_status()
     return response.json()
+
+def device_write_map(id, device_map):
+    payload = {
+        "devices": [{"realtime_id": device, "schema_id": device_map[device]} for device in device_map]
+    }
+    response = requests.put(
+        globals.get_full_url('devices/%s/map' % (id)),
+        json=payload,
+        headers=globals.get_headers(),
+    )
+    response.raise_for_status()
+    return response.json()
+
 

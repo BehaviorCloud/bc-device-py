@@ -45,8 +45,6 @@ class Coordinator:
 		self.parser.add_argument('--simulated', action='store_true', help='Will have the device stream simulated data.')
 
 	def spawn(self, dataset=None):
-		if self.device is None:
-			self.device = self.device_klass(simulated=self.simulated_mode)
 		if dataset is None:
 			for dataset in self.datasets:
 				self.device.start_collection(dataset)
@@ -58,6 +56,7 @@ class Coordinator:
 		set_config({
 			'HOST': arguments.host,
 			'TOKEN': arguments.token,
+			'ID': arguments.id,
 			'API_VERSION': '1.1',
 		})
 		self.simulated_mode = arguments.simulated
@@ -65,6 +64,11 @@ class Coordinator:
 		if not arguments.id:
 			flush_print('You must supply an id')
 			return
+
+		# instantiate device class and configure mapping
+		if self.device is None:
+			self.device = self.device_klass(simulated=self.simulated_mode)
+		api.device_write_map(arguments.id, self.device.get_device_map())
 
 		# retrieve associated realtime datasets
 		self.device_record = api.get_device_realtime_datasets(arguments.id)
@@ -77,12 +81,16 @@ class Coordinator:
 		# if any RT datasets are already in collecting mode, spawn immediately
 		# and set expirations appropriately.
 		for dataset in self.datasets:
-			observe_through = dateutil.parser.parse(dataset['observe_through'], ignoretz=True)
+			observe_through = (
+				dateutil.parser.parse(dataset['observe_through'], ignoretz=True)
+				if dataset['observe_through'] is not None
+				else None
+			)
 			flush_print('Dataset {} observe-through: {}'.format(
 				dataset['uuid'],
 				observe_through)
 			)
-			if observe_through > datetime.datetime.now():
+			if observe_through is not None and observe_through > datetime.datetime.now():
 				self.expirations[dataset['uuid']] = observe_through
 				self.spawn(dataset)
 
@@ -148,7 +156,11 @@ class Coordinator:
 				payload)
 			)
 			if 'observe_through' in payload:
-				observe_through = dateutil.parser.parse(payload['observe_through'], ignoretz=True)
+				observe_through = (
+					dateutil.parser.parse(payload['observe_through'], ignoretz=True)
+					if payload['observe_through'] is not None
+					else None
+				)
 				self.process_expiration(dataset_uuid, observe_through)
 		except Exception as e:
 			flush_print("Exception in handle_message: {}".format(e))
@@ -163,11 +175,12 @@ class Coordinator:
 		self.expirations_lock.acquire()
 		dataset = self.find_dataset(dataset_uuid)
 		if not dataset_uuid in self.expirations:
-			self.expirations[dataset_uuid] = expiration
-			self.spawn(dataset)
+			if expiration is not None:
+				self.expirations[dataset_uuid] = expiration
+				self.spawn(dataset)
 		else:
 			self.expirations[dataset_uuid] = expiration
-			if expiration < datetime.datetime.now():
+			if expiration is None or expiration < datetime.datetime.now():
 				del self.expirations[dataset_uuid]
 				self.device.stop_collection(dataset)
 		self.expirations_lock.release()

@@ -1,3 +1,7 @@
+from . import api
+
+VIDEO_SCHEMA = 4
+
 class Device(object):
     config = {}
     simulated = False
@@ -6,6 +10,9 @@ class Device(object):
         if configuration is not None:
             self.config = configuration
         self.simulated = simulated
+    
+    def get_device_map(self):
+        raise Exception('Not implemented')
     
     def start_collection(self, dataset):
         raise Exception('Not implemented')
