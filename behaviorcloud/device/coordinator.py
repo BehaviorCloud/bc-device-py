@@ -146,7 +146,7 @@ class Coordinator:
 		
 		def handle_disconnect(client, userdata, rc):
 			if rc != 0:
-        		flush_print('Unexpected disconnection from MQTT broker; will reconnect')
+				flush_print('Unexpected disconnection from MQTT broker; will reconnect')
 		
 		def handle_log(client, userdata, level, buf):
 			# flush_print('MQTT information: {}'.format(buf))
