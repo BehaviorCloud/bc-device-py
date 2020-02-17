@@ -128,6 +128,7 @@ class Coordinator:
 			flush_print('Subscription success')
 		
 		def handle_connect(client, data, flags, rc):
+			flush_print('Connected to MQTT broker')
 			self.mqtt_client.on_message = self.handle_message
 			for dataset in self.datasets:
 				if dataset['model_updates_topic'] is not None:
@@ -140,7 +141,17 @@ class Coordinator:
 				
 			flush_print('Waiting...')
 		
+		def handle_disconnect(client, userdata, rc):
+			if rc != 0:
+        		flush_print('Unexpected disconnection from MQTT broker; will reconnect')
+		
+		def handle_log(client, userdata, level, buf):
+			# flush_print('MQTT information: {}'.format(buf))
+			pass
+		
 		self.mqtt_client.on_connect = handle_connect
+		self.mqtt_client.on_disconnect = handle_disconnect
+		self.mqtt_client.on_log = handle_log
 		flush_print('Trying to connect to realtime endpoint {}'.format(
 			self.datasets[0]['model_updates_endpoint'])
 		)
