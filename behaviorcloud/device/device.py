@@ -3,6 +3,8 @@ from . import api
 VIDEO_SCHEMA = 4
 
 class Device(object):
+    firmware_name = 'Undefined'
+    firmware_version = 'Unknown'
     config = {}
     simulated = False
     

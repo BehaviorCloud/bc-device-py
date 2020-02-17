@@ -68,6 +68,9 @@ class Coordinator:
 		# instantiate device class and configure mapping
 		if self.device is None:
 			self.device = self.device_klass(simulated=self.simulated_mode)
+		
+		flush_print("Starting {} version {}".format(device.firmware_name, device.firmware_version))
+
 		api.device_write_map(arguments.id, self.device.get_device_map())
 
 		# retrieve associated realtime datasets
