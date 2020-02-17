@@ -69,7 +69,7 @@ class Coordinator:
 		if self.device is None:
 			self.device = self.device_klass(simulated=self.simulated_mode)
 		
-		flush_print("Starting {} version {}".format(device.firmware_name, device.firmware_version))
+		flush_print("Starting {} version {}".format(self.device.firmware_name, self.device.firmware_version))
 
 		api.device_write_map(arguments.id, self.device.get_device_map())
 
