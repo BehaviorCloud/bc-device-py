@@ -28,6 +28,7 @@ def flush_write(message):
 
 class Coordinator:
 	def __init__(self, device_klass):
+		self.device_id = None
 		self.device_record = None
 		self.device = None
 		self.device_klass = device_klass
@@ -64,6 +65,7 @@ class Coordinator:
 		if not arguments.id:
 			flush_print('You must supply an id')
 			return
+		self.device_id = arguments.id
 
 		# instantiate device class and configure mapping
 		if self.device is None:
@@ -74,7 +76,7 @@ class Coordinator:
 		api.device_write_map(arguments.id, self.device.get_device_map())
 
 		# retrieve associated realtime datasets
-		self.device_record = api.get_device_realtime_datasets(arguments.id)
+		self.device_record = api.get_device_realtime_datasets(self.device_id)
 		self.datasets = self.device_record['realtime_datasets']
 
 		flush_print('Device record loaded: {}'.format(
@@ -150,7 +152,21 @@ class Coordinator:
 		
 		def handle_log(client, userdata, level, buf):
 			flush_print('MQTT information: {}'.format(buf))
-			pass
+
+			if 'retrying' in buf:
+				flush_print('Trying to refresh device record for fresh MQTT data')
+				# try to retrieve updated model updates endpoint
+				try:
+					self.device_record = api.get_device_realtime_datasets(self.device_id)
+					self.datasets = self.device_record['realtime_datasets']
+					parsed_url = urlparse(self.datasets[0]['model_updates_endpoint'])
+					headers = {
+						"Host": "{0:s}".format(parsed_url.netloc),
+					}
+					self.mqtt_client.ws_set_options(path='?'.join([parsed_url.path, parsed_url.query]), headers=headers)
+					flush_print('Retrieved fresh device record and updated MQTT client headers')
+				except:
+					flush_print('Failed to retrieve device record')
 		
 		self.mqtt_client.on_connect = handle_connect
 		self.mqtt_client.on_disconnect = handle_disconnect
