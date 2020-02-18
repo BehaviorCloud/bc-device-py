@@ -15,7 +15,7 @@ except ImportError:
 
 from . import api
 from . import data
-from .globals import set_config
+from .globals import set_config, get_config
 # from .device import Device
 
 def flush_print(line):
@@ -34,10 +34,13 @@ class Coordinator:
 		self.device_klass = device_klass
 		self.mqtt_client = None
 		self.running = False
+		self.background_running = False
 		self.datasets = []
 		self.expirations = {}
 		self.expirations_lock = threading.Lock()
+		self.ping_response = None
 		self.simulated_mode = False
+		self.token_stamp = None
 		self.parser = argparse.ArgumentParser(description='Run a device firmware for the BehaviorCloud platform.')
 		self.parser.add_argument('--host', nargs='?', required=True, help='The hostname of the BehaviorCloud api server. Typically, this is api.behaviorcloud.com.')
 		self.parser.add_argument('--token', nargs='?', required=True, help='The JWT token provided by the BehaviorCloud platform.')
@@ -60,6 +63,7 @@ class Coordinator:
 			'ID': arguments.id,
 			'API_VERSION': '1.1',
 		})
+		self.token_stamp = datetime.datetime.now()
 		self.simulated_mode = arguments.simulated
 
 		if not arguments.id:
@@ -107,6 +111,8 @@ class Coordinator:
 		else:
 			self.start()
 		
+		self.run_background_refresh()
+		
 	def start(self):
 		if self.running:
 			return
@@ -119,6 +125,51 @@ class Coordinator:
 		while (self.running):
 			self.check_expirations()
 			time.sleep(0.01)
+	
+	def run_background_refresh(self):
+		if self.background_running:
+			return
+		self.background_running = True
+		flush_print('Starting background ping and token refresh')
+		t = threading.Thread(target=self.background_refresh)
+		t.start()
+	
+	def background_refresh(self):
+		while (self.background_running):
+			self.check_token()
+			self.periodic_ping()
+			time.sleep(60)
+	
+	def check_token(self):
+		if (datetime.datetime.now() - self.token_stamp) > datetime.timedelta(minutes=10):
+			flush_print("Requesting a JWT token refresh")
+				
+			# refresh token
+			try:
+				response = api.auth_refresh_token()
+				config = get_config()
+				config['TOKEN'] = response['token']
+				set_config(config)
+
+				self.token_stamp = datetime.datetime.now()
+
+				flush_print("Token refreshed successfully: {}".format(config['TOKEN']))
+			except:
+				flush_print("Failed to refresh token; will try again in a minute")
+
+	def periodic_ping(self):
+		response = api.device_ping(self.device_id)
+		
+		if self.ping_response is not None and self.ping_response != response:
+			if ('reboot_request' in self.ping_response and 
+				'reboot_request' in response and
+				self.ping_response['reboot_request'] != response['reboot_request']):
+				# Fall through and allow device to reboot
+				flush_print("A reboot request has been received: {}".format(response))
+				self.running = False
+				self.background_running = False
+		
+		self.ping_response = response
 	
 	def connect_mqtt(self):
 		parsed_url = urlparse(self.datasets[0]['model_updates_endpoint'])

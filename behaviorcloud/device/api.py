@@ -105,4 +105,23 @@ def device_write_map(id, device_map):
     response.raise_for_status()
     return response.json()
 
+def device_ping(id):
+    payload = {}
+    response = requests.put(
+        globals.get_full_url('devices/%s/ping' % (id)),
+        json=payload,
+        headers=globals.get_headers(),
+    )
+    response.raise_for_status()
+    return response.json()
 
+def auth_refresh_token():
+    payload = {
+        'token': globals.get_config()['TOKEN'],
+    }
+    response = requests.post(
+        globals.get_full_url('api-token-refresh'),
+        json=payload,
+    )
+    response.raise_for_status()
+    return response.json()
