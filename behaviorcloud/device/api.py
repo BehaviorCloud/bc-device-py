@@ -120,7 +120,7 @@ def auth_refresh_token():
         'token': globals.get_config()['TOKEN'],
     }
     response = requests.post(
-        globals.get_full_url('api-token-refresh/'),
+        globals.get_full_url('device-token-refresh/'),
         json=payload,
         headers=globals.get_headers(),
     )
