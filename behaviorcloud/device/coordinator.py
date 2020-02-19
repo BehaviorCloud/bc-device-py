@@ -154,22 +154,26 @@ class Coordinator:
 				self.token_stamp = datetime.datetime.now()
 
 				flush_print("Token refreshed successfully: {}".format(config['TOKEN']))
-			except:
-				flush_print("Failed to refresh token; will try again in a minute")
+			except Exception as e:
+				flush_print("Failed to refresh token due to {}; will try again in a minute".format(e))
 
 	def periodic_ping(self):
-		response = api.device_ping(self.device_id)
-		
-		if self.ping_response is not None and self.ping_response != response:
-			if ('reboot_request' in self.ping_response and 
-				'reboot_request' in response and
-				self.ping_response['reboot_request'] != response['reboot_request']):
-				# Fall through and allow device to reboot
-				flush_print("A reboot request has been received: {}".format(response))
-				self.running = False
-				self.background_running = False
-		
-		self.ping_response = response
+		try:
+			response = api.device_ping(self.device_id)
+			
+			if self.ping_response is not None and self.ping_response != response:
+				if ('reboot_request' in self.ping_response and 
+					'reboot_request' in response and
+					self.ping_response['reboot_request'] != response['reboot_request']):
+					# Fall through and allow device to reboot
+					flush_print("A reboot request has been received: {}".format(response))
+					self.running = False
+					self.background_running = False
+			
+			self.ping_response = response
+			flush_print("Sent periodic ping to API")
+		except Exception as e:
+			flush_print("Failed to send periodic ping to API because {}".format(e)))
 	
 	def connect_mqtt(self):
 		parsed_url = urlparse(self.datasets[0]['model_updates_endpoint'])
