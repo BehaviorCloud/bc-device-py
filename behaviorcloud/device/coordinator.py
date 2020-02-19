@@ -173,7 +173,7 @@ class Coordinator:
 			self.ping_response = response
 			flush_print("Sent periodic ping to API")
 		except Exception as e:
-			flush_print("Failed to send periodic ping to API because {}".format(e)))
+			flush_print("Failed to send periodic ping to API because {}".format(e))
 	
 	def connect_mqtt(self):
 		parsed_url = urlparse(self.datasets[0]['model_updates_endpoint'])
