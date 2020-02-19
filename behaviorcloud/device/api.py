@@ -122,6 +122,7 @@ def auth_refresh_token():
     response = requests.post(
         globals.get_full_url('api-token-refresh/'),
         json=payload,
+        headers=globals.get_headers(),
     )
     response.raise_for_status()
     return response.json()
